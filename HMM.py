@@ -20,7 +20,8 @@ class Sequence:
     def __len__(self):
         return len(self.outputseq)
 
-# HMM model
+
+
 class HMM:
     def __init__(self, transitions={}, emissions={}):
         """creates a model from transition and emission probabilities
@@ -87,3 +88,20 @@ class HMM:
     #
 
 
+
+
+# Main function
+def main():
+    # Test model file base name, test with cat first
+    model_name = 'cat'
+    # Initialize and load the HMM
+    hmm = HMM()
+    print("Loading model from files: ", model_name)
+    hmm.load(model_name)
+    print("Transitions: ", hmm.transitions)
+    print("Emissions: ", hmm.emissions)
+
+
+
+if __name__ == '__main__':
+    main()
