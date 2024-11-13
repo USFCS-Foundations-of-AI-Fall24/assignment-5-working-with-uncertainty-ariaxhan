@@ -28,8 +28,6 @@ class HMM:
               'grumpy': {'silent': '0.5', 'meow': '0.4', 'purr': '0.1'},
               'hungry': {'silent': '0.2', 'meow': '0.6', 'purr': '0.2'}}"""
 
-
-
         self.transitions = transitions
         self.emissions = emissions
 
@@ -38,7 +36,37 @@ class HMM:
         """reads HMM structure from transition (basename.trans),
         and emission (basename.emit) files,
         as well as the probabilities."""
-        pass
+
+        # Reset dictionaries
+        self.transitions = {}
+        self.emissions = {}
+
+        # Read transitions
+        with open(basename + '.trans', 'r') as f:
+            # Read each line
+            for line in f:
+                # Split the line into parts
+                parts = line.strip().split()
+                # If there are three parts
+                if len(parts) == 3:
+                    # Assign the parts to variables
+                    from_state, to_state, prob = parts
+                    # If the from_state is not in the transitions dictionary
+                    if from_state not in self.transitions:
+                        # Create a new dictionary
+                        self.transitions[from_state] = {}
+                    # Assign the probability to the to_state
+                    self.transitions[from_state][to_state] = prob
+
+        # Read emissions
+        with open(basename + '.emit', 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) == 3:
+                    state, output, prob = parts
+                    if state not in self.emissions:
+                        self.emissions[state] = {}
+                    self.emissions[state][output] = prob
 
 
    ## you do this.
@@ -52,17 +80,10 @@ class HMM:
     ## determine the most likely sequence of states.
 
 
-
-
-
-
     def viterbi(self, sequence):
         pass
     ## You do this. Given a sequence with a list of emissions, fill in the most likely
     ## hidden states using the Viterbi algorithm.
-
-
-
-
+    #
 
 
