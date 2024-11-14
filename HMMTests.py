@@ -29,6 +29,31 @@ class HMMTests(unittest.TestCase):
         }
         self.assertEqual(hmm.emissions, expected_emissions)
 
+    # Test the generate
+    def test_generate(self):
+        # Test model file base name
+        model_name = 'cat'
+        # Create an HMM object
+        hmm = HMM()
+        # Load the 'cat' model
+        hmm.load(model_name)
+        # Generate a sequence
+        seq = hmm.generate(10)
+        # Test the sequence
+        self.assertEqual(len(seq), 10)
+
+        # Now try it for the 'partofspeech'
+        model_name = 'partofspeech'
+        # Create an HMM object
+        hmm = HMM()
+        # Load the 'partofspeech' model
+        hmm.load(model_name)
+        # Generate a sequence
+        seq = hmm.generate(10)
+        # Test the sequence
+        self.assertEqual(len(seq), 10)
+
+
 
 if __name__ == '__main__':
     unittest.main()
