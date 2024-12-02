@@ -37,29 +37,33 @@ class HMM:
         """reads HMM structure from transition (basename.trans),
         and emission (basename.emit) files,
         as well as the probabilities."""
-
+        
         # Reset dictionaries
         self.transitions = {}
         self.emissions = {}
 
-        # Read transitions
+        # Load transitions
         with open(basename + '.trans', 'r') as f:
-            # Read each line
+            current_state = None
             for line in f:
-                # Split the line into parts
                 parts = line.strip().split()
-                # If there are three parts
-                if len(parts) == 3:
-                    # Assign the parts to variables
-                    from_state, to_state, prob = parts
-                    # If the from_state is not in the transitions dictionary
-                    if from_state not in self.transitions:
-                        # Create a new dictionary
-                        self.transitions[from_state] = {}
-                    # Assign the probability to the to_state
-                    self.transitions[from_state][to_state] = prob
+                if not parts:
+                    continue
 
-        # Read emissions
+                # Handle the starting state marker (#)
+                if line.startswith('#'):
+                    current_state = '#'
+                    self.transitions[current_state] = {}
+                    self.transitions[current_state][parts[1]] = float(parts[2])
+                    continue
+
+                # Transition lines
+                from_state, to_state, prob = parts
+                if from_state not in self.transitions:
+                    self.transitions[from_state] = {}
+                self.transitions[from_state][to_state] = float(prob)
+
+        # Load emissions
         with open(basename + '.emit', 'r') as f:
             for line in f:
                 parts = line.strip().split()
@@ -67,7 +71,8 @@ class HMM:
                     state, output, prob = parts
                     if state not in self.emissions:
                         self.emissions[state] = {}
-                    self.emissions[state][output] = prob
+                    self.emissions[state][output] = float(prob)
+        
 
 
    ## you do this.
@@ -94,6 +99,25 @@ class HMM:
             outputseq.append(output)
         # return the sequence
         return Sequence(stateseq, outputseq)
+
+    # Function to save a Sequence to a file in a proper obs format
+    def save_obs(self, seq, filename):
+        """
+        Saves the output sequence of a given Sequence object to a file.
+
+        Args:
+            seq (Sequence): The sequence to save, containing the output sequence.
+            filename (str): The name of the file to save the sequence to.
+        """
+        try:
+            # Open the file in write mode
+            with open(filename, 'w') as f:
+                # Iterate through the output sequence and write each output to a new line
+                for output in seq.outputseq:
+                    f.write(output + '\n')
+            print(f"Sequence successfully saved to {filename}.")
+        except Exception as e:
+            print(f"Error saving sequence to {filename}: {e}")
 
     # This tells us, for a sequence of observations, the most likely final state.
     # Forward should predict the most probable state given the sequence of emisssions.
@@ -140,10 +164,11 @@ class HMM:
 # Main function
 def main():
     # Parse command line arguments
-    # example: python hmm.py cat --generate 20
+    # example: python hmm.py cat --generate 20 --forward generated.obs
     parser = argparse.ArgumentParser(description='HMM')
     parser.add_argument('model', help='Model name')
     parser.add_argument('--generate', type=int, help='Generate a sequence of length n')
+    parser.add_argument('--forward', type=str, help='Run forward algorithm on an observation sequence')
     args = parser.parse_args()
 
     # Initialize and load the HMM
@@ -153,9 +178,33 @@ def main():
     print("Transitions: ", hmm.transitions)
     print("Emissions: ", hmm.emissions)
 
-    print("Generating a sequence of length ", args.generate)
-    seq = hmm.generate(args.generate)
-    print(seq)
+    # Generate a sequence if requested
+    if args.generate:
+        print("Generating a sequence of length ", args.generate)
+        seq = hmm.generate(args.generate)
+        print("Generated sequence:")
+        print(seq)
+
+        # Save the generated observation sequence
+        obs_filename = f"{args.model}_sequence.obs"
+        hmm.save_obs(seq, obs_filename)
+        print(f"Observation sequence saved to {obs_filename}")
+
+    # Run the forward algorithm if requested
+    if args.forward:
+        # Load the observation sequence
+        print(f"Running forward algorithm on observation sequence from {args.forward}")
+        with open(args.forward, 'r') as f:
+            obs_seq = [line.strip() for line in f.readlines()]
+
+        # Create a Sequence object with placeholder states (states are unknown here)
+        seq = Sequence(stateseq=[], outputseq=obs_seq)
+
+        # Run the forward algorithm
+        forward_probs = hmm.forward(seq)
+        print("Forward probabilities:")
+        for state, prob in forward_probs.items():
+            print(f"State {state}: {prob:.6f}")
 
 if __name__ == '__main__':
     main()
