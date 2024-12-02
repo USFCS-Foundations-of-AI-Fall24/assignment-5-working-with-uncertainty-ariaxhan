@@ -41,10 +41,8 @@ class HMM:
         # Reset dictionaries
         self.transitions = {}
         self.emissions = {}
-
         # Load transitions
         with open(basename + '.trans', 'r') as f:
-            current_state = None
             for line in f:
                 parts = line.strip().split()
                 if not parts:
@@ -53,7 +51,8 @@ class HMM:
                 # Handle the starting state marker (#)
                 if line.startswith('#'):
                     current_state = '#'
-                    self.transitions[current_state] = {}
+                    if current_state not in self.transitions:
+                        self.transitions[current_state] = {}
                     self.transitions[current_state][parts[1]] = float(parts[2])
                     continue
 
@@ -62,6 +61,12 @@ class HMM:
                 if from_state not in self.transitions:
                     self.transitions[from_state] = {}
                 self.transitions[from_state][to_state] = float(prob)
+
+        # Normalize transition probabilities
+        for state, transitions in self.transitions.items():
+            total = sum(transitions.values())
+            if total > 0:
+                self.transitions[state] = {k: v / total for k, v in transitions.items()}
 
         # Load emissions
         with open(basename + '.emit', 'r') as f:
@@ -72,7 +77,8 @@ class HMM:
                     if state not in self.emissions:
                         self.emissions[state] = {}
                     self.emissions[state][output] = float(prob)
-        
+
+
 
 
    ## you do this.
@@ -88,15 +94,38 @@ class HMM:
         state = '#'
         stateseq = []
         outputseq = []
-        # repeatedly select successor states at random
-        for i in range(n):
-            # select the next state using random choice, with the transition probability as a weight
-            state = numpy.random.choice(list(self.transitions[state].keys()), p=[float(x) for x in self.transitions[state].values()])
-            # select an emission using random choice, with the emission probability as a weight
-            output = numpy.random.choice(list(self.emissions[state].keys()), p=[float(x) for x in self.emissions[state].values()])
-            # append the state and output to the sequences
+
+        # Check transitions from '#'
+        if state in self.transitions and sum(self.transitions[state].values()) > 0:
+            transitions = self.transitions[state]
+            probabilities = [prob / sum(transitions.values()) for prob in transitions.values()]
+            state = numpy.random.choice(list(transitions.keys()), p=probabilities)
+        else:
+            raise ValueError(f"Initial state '{state}' has no valid transitions or is undefined.")
+
+        # Generate the sequence
+        for _ in range(n):
+            # Handle state transitions
+            transitions = self.transitions.get(state, {})
+            total = sum(transitions.values())
+            if total > 0:
+                probabilities = [prob / total for prob in transitions.values()]
+                state = numpy.random.choice(list(transitions.keys()), p=probabilities)
+            else:
+                raise ValueError(f"State '{state}' has no valid transitions.")
+
+            # Handle emissions
+            emissions = self.emissions.get(state, {})
+            total = sum(emissions.values())
+            if total > 0:
+                probabilities = [prob / total for prob in emissions.values()]
+                output = numpy.random.choice(list(emissions.keys()), p=probabilities)
+            else:
+                raise ValueError(f"State '{state}' has no valid emissions.")
+
             stateseq.append(state)
             outputseq.append(output)
+
         # return the sequence
         return Sequence(stateseq, outputseq)
 
@@ -128,22 +157,29 @@ class HMM:
         M = {state: [0] * len(sequence.outputseq) for state in self.transitions}
 
         # Set initial probabilities for the first item in the sequence (i=0), considering the '#' start state
-        for state in self.transitions:
-            M[state][0] = float(self.transitions['#'][state]) * float(self.emissions[state][sequence.outputseq[0]])
+        for state in self.transitions.get('#', {}):
+            if sequence.outputseq[0] in self.emissions.get(state, {}):
+                initial_prob = self.transitions['#'][state] * self.emissions[state][sequence.outputseq[0]]
+                M[state][0] = initial_prob
+                print(f"Initial probability for state {state}: {initial_prob}")
 
         # Iterate over each subsequent item in the sequence starting from the second item (i=1)
         for i in range(1, len(sequence.outputseq)):
-            for s in self.transitions:
+            for s in [state for state in self.transitions if state != '#']:
                 # Initialize the sum for the forward probability of state `s` at item `i`
                 sum_prob = 0
                 for s_prev in self.transitions:
                     # Compute the contribution of the previous state `s_prev` to `s` at item `i`
-                    transition_prob = float(self.transitions[s_prev][s])
-                    emission_prob = float(self.emissions[s][sequence.outputseq[i]])
-                    sum_prob += M[s_prev][i - 1] * transition_prob * emission_prob
+                    if s in self.transitions.get(s_prev, {}) and sequence.outputseq[i] in self.emissions.get(s, {}):
+                        transition_prob = float(self.transitions[s_prev][s])
+                        emission_prob = float(self.emissions[s][sequence.outputseq[i]])
+                        contrib = M[s_prev][i - 1] * transition_prob * emission_prob
+                        sum_prob += contrib
+                        print(f"Contribution to state {s} at time {i} from state {s_prev}: {contrib:.6f}")
 
                 # Store the computed forward probability in `M[s][i]`
                 M[s][i] = sum_prob
+                print(f"Forward probability for state {s} at time {i}: {sum_prob:.6f}")
 
         # Return the forward probabilities at the final item for each state
         return {state: M[state][-1] for state in self.transitions}
@@ -153,10 +189,37 @@ class HMM:
 
 
     def viterbi(self, sequence):
-        pass
-    ## You do this. Given a sequence with a list of emissions, fill in the most likely
-    ## hidden states using the Viterbi algorithm.
-    #
+        """
+        Viterbi algorithm to find the most likely sequence of states
+        given an observation sequence.
+        """
+        # Initialize Viterbi table and path trackers
+        V = {state: [0] * len(sequence.outputseq) for state in self.transitions if state != '#'}
+        path = {state: [] for state in V}
+
+        # Initialize base cases (t=0)
+        for state in self.transitions.get('#', {}):
+            if sequence.outputseq[0] in self.emissions.get(state, {}):
+                V[state][0] = (
+                        self.transitions['#'][state] * self.emissions[state][sequence.outputseq[0]]
+                )
+                path[state] = [state]
+
+        # Fill in Viterbi table
+        for t in range(1, len(sequence.outputseq)):
+            for s in V:
+                max_prob, best_prev = max(
+                    (V[prev_state][t - 1] * self.transitions[prev_state].get(s, 0) *
+                     self.emissions[s].get(sequence.outputseq[t], 0), prev_state)
+                    for prev_state in V
+                )
+                V[s][t] = max_prob
+                path[s] = path[best_prev] + [s]
+
+        # Find the best final state
+        max_final_prob, best_final_state = max((V[state][-1], state) for state in V)
+
+        return path[best_final_state], max_final_prob
 
 
 
@@ -169,6 +232,7 @@ def main():
     parser.add_argument('model', help='Model name')
     parser.add_argument('--generate', type=int, help='Generate a sequence of length n')
     parser.add_argument('--forward', type=str, help='Run forward algorithm on an observation sequence')
+    parser.add_argument('--viterbi', type=str, help='Run Viterbi algorithm on an observation sequence')
     args = parser.parse_args()
 
     # Initialize and load the HMM
@@ -180,21 +244,23 @@ def main():
 
     # Generate a sequence if requested
     if args.generate:
+        print(f"Transitions from '#': {hmm.transitions.get('#')}")
         print("Generating a sequence of length ", args.generate)
         seq = hmm.generate(args.generate)
         print("Generated sequence:")
         print(seq)
 
-        # Save the generated observation sequence
-        obs_filename = f"{args.model}_sequence.obs"
-        hmm.save_obs(seq, obs_filename)
-        print(f"Observation sequence saved to {obs_filename}")
-
-    # Run the forward algorithm if requested
     if args.forward:
-        # Load the observation sequence
-        print(f"Running forward algorithm on observation sequence from {args.forward}")
-        with open(args.forward, 'r') as f:
+        # Generate a sequence for the specified model and save it to the specified file
+        generated_file = args.forward
+        print(f"Generating a sequence for {args.model} and saving it to {generated_file}...")
+
+        seq = hmm.generate(20)  # Adjust the length of the sequence as needed
+        hmm.save_obs(seq, generated_file)  # Use the save_obs method here
+
+        # Load the observation sequence from the generated file
+        print(f"Running forward algorithm on observation sequence from {generated_file}...")
+        with open(generated_file, 'r') as f:
             obs_seq = [line.strip() for line in f.readlines()]
 
         # Create a Sequence object with placeholder states (states are unknown here)
@@ -205,6 +271,21 @@ def main():
         print("Forward probabilities:")
         for state, prob in forward_probs.items():
             print(f"State {state}: {prob:.6f}")
+
+    # Run the Viterbi algorithm if requested
+    if args.viterbi:
+        print(f"Running Viterbi algorithm on observation sequence from {args.viterbi}")
+        with open(args.viterbi, 'r') as f:
+            obs_seq = [line.strip() for line in f.readlines()]
+
+        # Create a Sequence object with placeholder states (states are unknown here)
+        seq = Sequence(stateseq=[], outputseq=obs_seq)
+
+        # Run the Viterbi algorithm
+        most_likely_path, max_prob = hmm.viterbi(seq)
+        print("Most likely sequence of states:")
+        print(' '.join(most_likely_path))
+        print(f"Probability of the sequence: {max_prob:.6f}")
 
 if __name__ == '__main__':
     main()
