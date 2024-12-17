@@ -1,0 +1,65 @@
+Assignment 5 Comments:
+
+sklearn:
+
+new dataset. 5/5
+
+random forest 5/5
+
+GridSearchCV 5/5
+
+Scatterplot 5/5
+
+Belief Networks:
+
+alarm queries 5/5
+
+car queries 5/5
+
+additional node 5/5
+
+HMM:
+
+load 5/5
+
+generate 10/10
+
+lander models 5/5
+
+forward 7/10 - mostly working, but final probabilities are wrong:
+Forward probabilities:
+State #: 0.000000
+State happy: 0.000000
+State grumpy: 0.000000
+State hungry: 0.000000
+
+viterbi 10/15 - getting there, but it crashes.
+Traceback (most recent call last):
+  File "/Users/cbrooks/courses/Fall24/CS362/student_repos/assignment5/assignment-5-working-with-uncertainty-submissions/assignment-5-working-with-uncertainty-ariaxhan/HMM.py", line 330, in <module>
+    main()
+  File "/Users/cbrooks/courses/Fall24/CS362/student_repos/assignment5/assignment-5-working-with-uncertainty-submissions/assignment-5-working-with-uncertainty-ariaxhan/HMM.py", line 324, in main
+    most_likely_path, max_prob = hmm.viterbi(seq)
+  File "/Users/cbrooks/courses/Fall24/CS362/student_repos/assignment5/assignment-5-working-with-uncertainty-submissions/assignment-5-working-with-uncertainty-ariaxhan/HMM.py", line 245, in viterbi
+    raise ValueError("No valid path found for the given observation sequence.")
+ValueError: No valid path found for the given observation sequence.
+
+
+
+Utility:
+
+q1 5/5
+
+q2 5/5
+
+q3 1/2 - need to renormalize the probabilities
+
+q4 3/3
+
+q5 2/2
+
+q6 3/3
+
+91/100
+
+
+
